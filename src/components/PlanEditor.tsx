@@ -18,6 +18,7 @@ import {
   edgeOf,
   findRoom,
   insertVertex,
+  MIN_EDGE_LENGTH,
   moveEdge,
   moveRoom,
   moveVertex,
@@ -63,7 +64,9 @@ interface View {
 type Drag =
   | { kind: 'pan'; startClient: Vec2; startView: View; moved: boolean }
   | { kind: 'room'; roomId: string; start: Vec2; origin: Plan; moved: boolean }
-  | { kind: 'vertex'; roomId: string; index: number; origin: Plan; moved: boolean }
+  /** `undoTo`: plan to restore on undo when it differs from `origin` (a corner inserted at drag start). */
+  /** `grab`: offset from the pointer to the corner, when the drag didn't start on the corner itself. */
+  | { kind: 'vertex'; roomId: string; index: number; origin: Plan; moved: boolean; undoTo?: Plan; grab?: Vec2 }
   | { kind: 'edge'; roomId: string; index: number; start: Vec2; origin: Plan; moved: boolean }
   | { kind: 'window'; roomId: string; wall: number; windowId: string; origin: Plan; moved: boolean }
   | { kind: 'doorway'; door: Doorway; grab: number; origin: Plan; moved: boolean };
@@ -219,13 +222,15 @@ export function PlanEditor({ plan, doorways, selection, grid, fitKey, onSelect, 
   const begin = (e: React.PointerEvent, d: Drag) => {
     if (e.button !== 0 && d.kind !== 'pan') return;
     e.stopPropagation();
-    svgRef.current!.setPointerCapture(e.pointerId);
     drag.current = d;
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current;
     if (!d) return;
+    // Capture lazily: capturing on pointerdown would retarget click/dblclick to the SVG.
+    const svg = svgRef.current!;
+    if (!svg.hasPointerCapture(e.pointerId)) svg.setPointerCapture(e.pointerId);
     const thr = SNAP_PX / view.zoom;
     const p = toWorld(e);
     if (d.kind === 'pan') {
@@ -254,7 +259,7 @@ export function PlanEditor({ plan, doorways, selection, grid, fitKey, onSelect, 
         break;
       }
       case 'vertex':
-        next = moveVertex(d.origin, d.roomId, d.index, snapPoint(p, d.origin, d.roomId, thr, grid));
+        next = moveVertex(d.origin, d.roomId, d.index, snapPoint(d.grab ? add(p, d.grab) : p, d.origin, d.roomId, thr, grid));
         break;
       case 'edge': {
         const delta = snapEdgeDelta(room, d.index, sub(p, d.start), d.origin, thr, grid, e.shiftKey);
@@ -282,7 +287,7 @@ export function PlanEditor({ plan, doorways, selection, grid, fitKey, onSelect, 
     if (d.kind === 'pan') {
       if (!d.moved) onSelect({});
     } else if (d.moved) {
-      onCommit(d.origin);
+      onCommit(d.kind === 'vertex' && d.undoTo ? d.undoTo : d.origin);
     }
   };
 
@@ -539,6 +544,39 @@ export function PlanEditor({ plan, doorways, selection, grid, fitKey, onSelect, 
               <title>Drag to move corner · Delete to remove</title>
             </circle>
           ))}
+
+        {/* "+" just inside each wall's midpoint (clear of doorways): click to add a corner there, or drag to pull one out */}
+        {selRoom &&
+          selRoom.points.map((_, i) => {
+            const [a, b] = edgeOf(selRoom, i);
+            if (dist(a, b) < 2 * MIN_EDGE_LENGTH) return null;
+            const w = layouts.get(selRoom.id)![i];
+            const mid = scale(add(a, b), 0.5);
+            const r = 5 * px;
+            const m = add(mid, scale(w.normal, w.thickness + r + 4 * px));
+            return (
+              <g
+                key={`add-${i}`}
+                className="add-vertex"
+                onPointerDown={(e) => {
+                  const next = insertVertex(plan, selRoom.id, i, mid);
+                  if (!next) return;
+                  onPreview(next);
+                  onSelect({ roomId: selRoom.id, vertex: i + 1 });
+                  // moved: true so even a plain click is committed as one undo step.
+                  const grab = sub(mid, toWorld(e));
+                  begin(e, { kind: 'vertex', roomId: selRoom.id, index: i + 1, origin: next, undoTo: plan, moved: true, grab });
+                }}
+              >
+                <circle cx={m.x} cy={m.y} r={r} strokeWidth={1.5 * px} />
+                <path
+                  d={`M ${m.x - r * 0.55} ${m.y} H ${m.x + r * 0.55} M ${m.x} ${m.y - r * 0.55} V ${m.y + r * 0.55}`}
+                  strokeWidth={1.5 * px}
+                />
+                <title>Click or drag to add a corner</title>
+              </g>
+            );
+          })}
       </svg>
 
       <div className="editor-hud">
@@ -547,7 +585,7 @@ export function PlanEditor({ plan, doorways, selection, grid, fitKey, onSelect, 
       </div>
       {blocked && <div className="editor-blocked">Rooms can't overlap or self-intersect</div>}
       <div className="editor-help">
-        Drag floor: move room · drag wall: move wall · double-click wall: add corner · drag background: pan · wheel: zoom
+        Drag floor: move room · drag wall: move wall · + or double-click wall: add corner · drag background: pan · wheel: zoom
       </div>
     </div>
   );

@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { polygonArea } from '../model/geometry';
 import {
   addWindow,
+  edgeOf,
   findRoom,
+  insertVertex,
+  MIN_EDGE_LENGTH,
   moveVertex,
   removeRoom,
   removeVertex,
@@ -248,6 +251,19 @@ export function Inspector({ plan, doorways, selection, onSelect, onApply, onErro
             }}
           >
             + Add window
+          </button>
+          <button
+            disabled={wallLength(room, wallIndex) < 2 * MIN_EDGE_LENGTH}
+            title="Add a corner in the middle of this wall"
+            onClick={() => {
+              const [a, b] = edgeOf(room, wallIndex);
+              const next = insertVertex(plan, room.id, wallIndex, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+              if (!next) return onError('This wall is too short to split');
+              onApply(next);
+              onSelect({ roomId: room.id, vertex: wallIndex + 1 });
+            }}
+          >
+            Split wall (add corner)
           </button>
           {wall.windows.map((win, k) => (
             <div key={win.id} className={`window-card ${selection.windowId === win.id ? 'selected' : ''}`}>

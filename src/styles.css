@@ -88,6 +88,11 @@ label.inline { display: inline-flex; align-items: center; gap: 6px; color: var(-
 
 .vertex { fill: #fff; stroke: var(--accent); cursor: move; }
 .vertex:hover, .vertex.selected { fill: var(--accent); }
+.add-vertex { cursor: copy; }
+.add-vertex circle { fill: #fff; stroke: var(--accent); opacity: 0.85; }
+.add-vertex path { stroke: var(--accent); }
+.add-vertex:hover circle { fill: var(--accent); opacity: 1; }
+.add-vertex:hover path { stroke: #fff; }
 
 .editor-hud { position: absolute; top: 10px; left: 10px; display: flex; gap: 8px; align-items: center; color: var(--muted); }
 .editor-help { position: absolute; bottom: 8px; left: 10px; right: 10px; color: var(--muted); font-size: 12px; pointer-events: none; }
