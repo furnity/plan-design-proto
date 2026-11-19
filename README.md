@@ -9,6 +9,9 @@ npm test         # model unit tests
 npm run build
 ```
 
+## Deploying
+Every push to `main` runs the tests, builds the site and deploys it to GitHub Pages (`.github/workflows/deploy.yml`). It can also be started by hand from the Actions tab. One-time setup: in the repo's **Settings → Pages**, set **Source** to **GitHub Actions**. The build uses relative asset paths, so it works under `https://<owner>.github.io/<repo>/`.
+
 ## Using it
 - **Drag a floor** to move a room. **Drag a wall** to move it along its normal (hold Shift to move it freely). On the selected room, **drag a corner** handle.
 - **Add a corner** by clicking or dragging the "+" handle in the middle of a wall of the selected room, by double-clicking a wall, or with "Split wall" in the wall inspector. Select a corner and press Delete to remove it.
