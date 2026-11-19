@@ -1,5 +1,5 @@
 import { add, dist, dot, normalize, perp, scale, sub } from './geometry';
-import { edgeOf } from './plan';
+import { edgeOf, pairKey } from './plan';
 import type { Doorway, Plan, Room } from './types';
 
 /** Max distance (cm) between two wall lines for them to count as adjoining. */
@@ -41,15 +41,17 @@ export function sharedEdge(a: Room, b: Room): SharedEdge | null {
 
 /**
  * Doorways are derived from geometry: whenever two rooms share a stretch of
- * wall that is wide enough, a doorway is placed in the middle of it.
+ * wall that is wide enough, a doorway is placed on it. By default it sits in
+ * the middle; `plan.doorwaySettings` can shift it along the stretch or disable
+ * it. Disabled doorways are still returned (flagged) so the UI can re-enable them.
  */
 export function computeDoorways(plan: Plan): Doorway[] {
   const result: Doorway[] = [];
   const { rooms, settings } = plan;
   for (let i = 0; i < rooms.length; i++) {
     for (let j = i + 1; j < rooms.length; j++) {
-      const a = rooms[i];
-      const b = rooms[j];
+      // Order the pair by id so offsets keep their direction if rooms are reordered.
+      const [a, b] = rooms[i].id < rooms[j].id ? [rooms[i], rooms[j]] : [rooms[j], rooms[i]];
       const shared = sharedEdge(a, b);
       if (!shared) continue;
       // Keep clear of the perpendicular walls at either end of the shared stretch.
@@ -60,15 +62,25 @@ export function computeDoorways(plan: Plan): Doorway[] {
       if (width < MIN_DOOR_WIDTH) continue;
       const [a0, a1] = edgeOf(a, shared.edgeA);
       const d = normalize(sub(a1, a0));
-      const center = add(a0, scale(d, (shared.lo + shared.hi) / 2));
+      const stretchCenter = add(a0, scale(d, (shared.lo + shared.hi) / 2));
+      const key = pairKey(a.id, b.id);
+      const setting = plan.doorwaySettings?.[key] ?? {};
+      const maxOffset = Math.max(0, (available - width) / 2);
+      const offset = Math.min(maxOffset, Math.max(-maxOffset, setting.offset ?? 0));
       const height = Math.min(settings.doorHeight, a.ceilingHeight - 10, b.ceilingHeight - 10);
       result.push({
         id: `door_${a.id}_${b.id}`,
+        key,
         rooms: [a.id, b.id],
         walls: [shared.edgeA, shared.edgeB],
-        center,
+        center: add(stretchCenter, scale(d, offset)),
         width,
         height,
+        disabled: !!setting.disabled,
+        offset,
+        maxOffset,
+        stretchCenter,
+        axis: d,
       });
     }
   }

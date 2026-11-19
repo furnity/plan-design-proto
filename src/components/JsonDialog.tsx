@@ -32,7 +32,8 @@ export function JsonDialog({ plan, onApply, onClose }: Props) {
           </button>
         </header>
         <p className="muted">
-          Lengths are in cm. <code>doorways</code> is derived from the geometry and recomputed on load.
+          Lengths are in cm. <code>doorways</code> is derived from the geometry and recomputed on load; doorway
+          position and on/off are stored in <code>doorwaySettings</code>, keyed by room id pair.
         </p>
         <textarea spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
         {error && <p className="error">{error}</p>}

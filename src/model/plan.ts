@@ -12,7 +12,7 @@ import {
   sub,
   v,
 } from './geometry';
-import { FLOOR_TYPES, type FloorType, type Plan, type Room, type Vec2, type Wall, type WindowSpec } from './types';
+import { FLOOR_TYPES, type DoorwaySetting, type FloorType, type Plan, type Room, type Vec2, type Wall, type WindowSpec } from './types';
 
 export const DEFAULT_WALL_THICKNESS = 10;
 export const DEFAULT_CEILING_HEIGHT = 250;
@@ -42,7 +42,16 @@ export function createInitialPlan(): Plan {
     units: 'cm',
     settings: { doorWidth: 90, doorHeight: 210 },
     rooms: [createRectRoom(0, 0, 500, 400, 'Room 1')],
+    doorwaySettings: {},
   };
+}
+
+/** Order-independent key for a pair of rooms. */
+export const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+
+export function setDoorway(plan: Plan, key: string, patch: DoorwaySetting): Plan {
+  const current = plan.doorwaySettings[key] ?? {};
+  return { ...plan, doorwaySettings: { ...plan.doorwaySettings, [key]: { ...current, ...patch } } };
 }
 
 export const edgeOf = (room: Room, i: number): [Vec2, Vec2] => [
@@ -231,7 +240,10 @@ export function removeWindow(plan: Plan, roomId: string, index: number, windowId
 }
 
 export function removeRoom(plan: Plan, roomId: string): Plan {
-  return { ...plan, rooms: plan.rooms.filter((r) => r.id !== roomId) };
+  const doorwaySettings = Object.fromEntries(
+    Object.entries(plan.doorwaySettings).filter(([key]) => !key.split('|').includes(roomId)),
+  );
+  return { ...plan, rooms: plan.rooms.filter((r) => r.id !== roomId), doorwaySettings };
 }
 
 /**
@@ -316,11 +328,22 @@ export function parsePlan(input: string | unknown): Plan {
       floorType,
     });
   });
+  const doorwaySettings: Record<string, DoorwaySetting> = {};
+  if (d.doorwaySettings && typeof d.doorwaySettings === 'object') {
+    for (const [key, raw] of Object.entries(d.doorwaySettings as Record<string, Record<string, unknown>>)) {
+      if (!raw || typeof raw !== 'object') continue;
+      const setting: DoorwaySetting = {};
+      if (raw.disabled === true) setting.disabled = true;
+      if (typeof raw.offset === 'number' && Number.isFinite(raw.offset)) setting.offset = raw.offset;
+      doorwaySettings[key] = setting;
+    }
+  }
   const plan: Plan = {
     version: 1,
     units: 'cm',
     settings: { doorWidth: num(s.doorWidth, 90), doorHeight: num(s.doorHeight, 210) },
     rooms,
+    doorwaySettings,
   };
   const problem = planProblem(plan);
   if (problem) throw new Error(problem);

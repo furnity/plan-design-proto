@@ -21,6 +21,7 @@ import {
   moveEdge,
   moveRoom,
   moveVertex,
+  setDoorway,
   updateWindow,
 } from '../model/plan';
 import { FLOOR_TYPES, type Doorway, type Plan, type Room, type Vec2 } from '../model/types';
@@ -32,6 +33,8 @@ export interface Selection {
   wall?: number;
   vertex?: number;
   windowId?: string;
+  /** Selected doorway (`Doorway.key`); used without `roomId`. */
+  doorwayKey?: string;
 }
 
 interface Props {
@@ -62,7 +65,8 @@ type Drag =
   | { kind: 'room'; roomId: string; start: Vec2; origin: Plan; moved: boolean }
   | { kind: 'vertex'; roomId: string; index: number; origin: Plan; moved: boolean }
   | { kind: 'edge'; roomId: string; index: number; start: Vec2; origin: Plan; moved: boolean }
-  | { kind: 'window'; roomId: string; wall: number; windowId: string; origin: Plan; moved: boolean };
+  | { kind: 'window'; roomId: string; wall: number; windowId: string; origin: Plan; moved: boolean }
+  | { kind: 'doorway'; door: Doorway; grab: number; origin: Plan; moved: boolean };
 
 const SNAP_PX = 10;
 
@@ -231,6 +235,15 @@ export function PlanEditor({ plan, doorways, selection, grid, fitKey, onSelect, 
       setView({ ...d.startView, x: d.startView.x - dx / view.zoom, y: d.startView.y - dy / view.zoom });
       return;
     }
+    if (d.kind === 'doorway') {
+      // Slide along the shared wall stretch, keeping the grab point under the cursor.
+      const { door } = d;
+      const along = dot(sub(p, door.stretchCenter), door.axis) - d.grab;
+      const offset = Math.min(door.maxOffset, Math.max(-door.maxOffset, snap(along, 5)));
+      d.moved = true;
+      onPreview(setDoorway(d.origin, door.key, { offset }));
+      return;
+    }
     const room = findRoom(d.origin, d.roomId);
     if (!room) return;
     let next: Plan | null = null;
@@ -371,6 +384,7 @@ export function PlanEditor({ plan, doorways, selection, grid, fitKey, onSelect, 
 
         {/* Door swings */}
         {doorways.map((door) => {
+          if (door.disabled) return null;
           const w = layouts.get(door.rooms[0])?.[door.walls[0]];
           const o = w?.openings.find((x) => x.id === door.id);
           if (!w || !o) return null;
@@ -470,6 +484,41 @@ export function PlanEditor({ plan, doorways, selection, grid, fitKey, onSelect, 
                   );
                 })}
             </g>
+          );
+        })}
+
+        {/* Doorways: drag to slide along the shared wall; disabled ones show as a dashed marker */}
+        {doorways.map((door) => {
+          const wa = layouts.get(door.rooms[0])?.[door.walls[0]];
+          const wb = layouts.get(door.rooms[1])?.[door.walls[1]];
+          if (!wa || !wb) return null;
+          const s = dot(sub(door.center, wa.p0), wa.dir);
+          const half = door.width / 2;
+          // Span both back-to-back walls: room A's inner face to room B's inner face.
+          const footprint = [
+            wallPoint(wa, s - half, 1),
+            wallPoint(wa, s + half, 1),
+            add(wallPoint(wa, s + half, 0), scale(wa.normal, -wb.thickness)),
+            add(wallPoint(wa, s - half, 0), scale(wa.normal, -wb.thickness)),
+          ];
+          const sel = selection.doorwayKey === door.key;
+          return (
+            <polygon
+              key={`hit-${door.key}`}
+              className={`doorway-hit ${door.disabled ? 'disabled' : ''} ${sel ? 'selected' : ''}`}
+              points={pointsAttr(footprint)}
+              strokeWidth={1.5 * px}
+              strokeDasharray={door.disabled ? `${4 * px} ${3 * px}` : undefined}
+              onPointerDown={(e) => {
+                onSelect({ doorwayKey: door.key });
+                const grab = dot(sub(toWorld(e), door.stretchCenter), door.axis) - door.offset;
+                begin(e, { kind: 'doorway', door, grab, origin: plan, moved: false });
+              }}
+            >
+              <title>
+                {door.disabled ? 'Disabled doorway · select to re-enable' : 'Drag to move doorway · Delete to disable'}
+              </title>
+            </polygon>
           );
         })}
 

@@ -84,7 +84,7 @@ export function roomWallLayouts(room: Room, doorways: Doorway[] = []): WallLayou
     }
     doorways.forEach((door) => {
       const k = door.rooms.indexOf(room.id);
-      if (k < 0 || door.walls[k] !== i) return;
+      if (door.disabled || k < 0 || door.walls[k] !== i) return;
       const s = dot(sub(door.center, f.p), f.d);
       openings.push({
         kind: 'door',

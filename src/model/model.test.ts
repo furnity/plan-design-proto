@@ -13,7 +13,9 @@ import {
   moveRoom,
   moveVertex,
   parsePlan,
+  removeRoom,
   removeVertex,
+  setDoorway,
 } from './plan';
 import type { Plan } from './types';
 import { roomWallLayouts, sliceWall, wallFootprint } from './walls';
@@ -77,11 +79,47 @@ describe('editing', () => {
 
 describe('doorways', () => {
   it('creates one doorway on the shared wall stretch', () => {
-    const doors = computeDoorways(twoRooms());
+    const plan = twoRooms();
+    const doors = computeDoorways(plan);
     expect(doors).toHaveLength(1);
     expect(doors[0].center.x).toBeCloseTo(500);
     expect(doors[0].center.y).toBeCloseTo(150); // middle of the 0..300 overlap
-    expect(doors[0].walls).toEqual([1, 3]);
+    const [a, b] = plan.rooms;
+    const wallOf = (id: string) => doors[0].walls[doors[0].rooms.indexOf(id)];
+    expect(wallOf(a.id)).toBe(1);
+    expect(wallOf(b.id)).toBe(3);
+  });
+
+  it('can be moved along the shared wall, clamped to it', () => {
+    let plan = twoRooms();
+    const [door] = computeDoorways(plan);
+    // Shared stretch is y 0..300; clearance 15 at each end leaves 270 for a 90 wide door → ±90.
+    expect(door.maxOffset).toBeCloseTo(90);
+    plan = setDoorway(plan, door.key, { offset: 50 });
+    const moved = computeDoorways(plan)[0];
+    expect(moved.offset).toBe(50);
+    expect(moved.center.y).toBeCloseTo(150 + 50 * door.axis.y);
+    plan = setDoorway(plan, door.key, { offset: 1000 });
+    expect(computeDoorways(plan)[0].offset).toBeCloseTo(90);
+  });
+
+  it('can be disabled, leaving the walls solid', () => {
+    let plan = twoRooms();
+    const [door] = computeDoorways(plan);
+    plan = setDoorway(plan, door.key, { disabled: true });
+    const doors = computeDoorways(plan);
+    expect(doors[0].disabled).toBe(true);
+    const a = plan.rooms[0];
+    expect(roomWallLayouts(a, doors)[1].openings).toHaveLength(0);
+    expect(buildPlanModel(plan).children[0].getObjectByName('wall-1')!.children).toHaveLength(1);
+  });
+
+  it('settings survive JSON and are dropped with their room', () => {
+    let plan = twoRooms();
+    const key = computeDoorways(plan)[0].key;
+    plan = setDoorway(plan, key, { offset: -30, disabled: true });
+    expect(parsePlan(serializePlan(plan)).doorwaySettings[key]).toEqual({ offset: -30, disabled: true });
+    expect(removeRoom(plan, plan.rooms[1].id).doorwaySettings).toEqual({});
   });
 
   it('no doorway when rooms are apart or only touch at a corner', () => {

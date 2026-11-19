@@ -14,6 +14,7 @@ npm run build
 - **Double-click a wall** to add a corner. Select a corner and press Delete to remove it.
 - A move that would overlap another room or make a room's outline cross itself is refused, and a red banner appears.
 - When two rooms share a wall, a doorway is created automatically. Its width and height are set under Plan settings.
+- **Drag a doorway** to slide it along the shared wall. Select it and press Delete (or untick "Enabled") to disable it. Click its dashed outline to select it again and re-enable it.
 - Select a wall to set its thickness (default 10 cm) and to add windows. Each window has a width, a height, a distance from the floor and a position along the wall. Windows can also be dragged along the wall.
 - Ctrl+Z undoes and Ctrl+Shift+Z redoes. The plan is saved automatically to localStorage.
 
@@ -27,5 +28,5 @@ npm run build
 
 ## Design decisions
 - A room's polygon is its **outer** outline, and its walls are built inward. Rooms that adjoin each other have back-to-back walls, so checking for overlap only needs a polygon test.
-- Doorways are **derived**, not stored. Each pair of adjoining rooms gets one doorway, centred on the longest stretch of wall they share. Doorways are included in exported JSON for other programs to use, and are recalculated when a plan is loaded.
+- Doorways are **derived**, not stored. Each pair of adjoining rooms gets one doorway, on the longest stretch of wall they share. Only your adjustments are stored, in `doorwaySettings`, keyed by the pair of room IDs: an offset from the middle of the shared stretch, and whether the doorway is disabled. They persist if the rooms are separated and rejoined. Doorways (including disabled ones) are included in exported JSON for other programs to use, and are recalculated when a plan is loaded.
 - The 3D view toolbar exports the model as Three.js JSON (`THREE.ObjectLoader` format) or as GLB.

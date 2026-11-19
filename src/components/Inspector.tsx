@@ -7,6 +7,7 @@ import {
   removeRoom,
   removeVertex,
   removeWindow,
+  setDoorway,
   updateRoom,
   updateWall,
   updateWindow,
@@ -58,6 +59,8 @@ const round = (n: number) => Math.round(n * 10) / 10;
 
 export function Inspector({ plan, doorways, selection, onSelect, onApply, onError }: Props) {
   const room = findRoom(plan, selection.roomId);
+  const roomName = (id: string) => findRoom(plan, id)?.name ?? '?';
+  const otherRoom = (d: Doorway, id: string) => roomName(d.rooms[0] === id ? d.rooms[1] : d.rooms[0]);
 
   const settings = (
     <section>
@@ -77,11 +80,49 @@ export function Inspector({ plan, doorways, selection, onSelect, onApply, onErro
         onChange={(doorHeight) => onApply({ ...plan, settings: { ...plan.settings, doorHeight } })}
       />
       <p className="muted">
-        {plan.rooms.length} room{plan.rooms.length === 1 ? '' : 's'} · {doorways.length} doorway
-        {doorways.length === 1 ? '' : 's'}. Doorways are created automatically where rooms share a wall.
+        {plan.rooms.length} room{plan.rooms.length === 1 ? '' : 's'} · {doorways.filter((d) => !d.disabled).length} doorway
+        {doorways.filter((d) => !d.disabled).length === 1 ? '' : 's'}. Doorways are created automatically where rooms
+        share a wall; select one to move or disable it.
       </p>
     </section>
   );
+
+  const door = doorways.find((d) => d.key === selection.doorwayKey);
+  if (door) {
+    return (
+      <aside className="inspector">
+        <section>
+          <h3>Doorway</h3>
+          <p>
+            {roomName(door.rooms[0])} ↔ {roomName(door.rooms[1])}
+          </p>
+          <label className="field checkbox">
+            <span>Enabled</span>
+            <input
+              type="checkbox"
+              checked={!door.disabled}
+              onChange={(e) => onApply(setDoorway(plan, door.key, { disabled: !e.target.checked }))}
+            />
+          </label>
+          <NumberField
+            label="Offset"
+            value={door.offset}
+            min={-door.maxOffset}
+            max={door.maxOffset}
+            onChange={(offset) => onApply(setDoorway(plan, door.key, { offset }))}
+          />
+          <p className="muted">
+            Distance from the middle of the shared wall (±{Math.round(door.maxOffset)} cm available). Width{' '}
+            {Math.round(door.width)} cm, height {Math.round(door.height)} cm. Drag the doorway in the plan to move it.
+          </p>
+          <button disabled={door.offset === 0} onClick={() => onApply(setDoorway(plan, door.key, { offset: 0 }))}>
+            Centre on wall
+          </button>
+        </section>
+        {settings}
+      </aside>
+    );
+  }
 
   if (!room) {
     return (
@@ -165,6 +206,28 @@ export function Inspector({ plan, doorways, selection, onSelect, onApply, onErro
           </tbody>
         </table>
       </section>
+
+      {doorways.some((d) => d.rooms.includes(room.id)) && (
+        <section>
+          <h3>Doorways</h3>
+          {doorways
+            .filter((d) => d.rooms.includes(room.id))
+            .map((d) => (
+              <div key={d.key} className="doorway-row">
+                <input
+                  type="checkbox"
+                  title={d.disabled ? 'Enable doorway' : 'Disable doorway'}
+                  checked={!d.disabled}
+                  onChange={(e) => onApply(setDoorway(plan, d.key, { disabled: !e.target.checked }))}
+                />
+                <button className="link" onClick={() => onSelect({ doorwayKey: d.key })}>
+                  To {otherRoom(d, room.id)}
+                </button>
+                <span className="muted">{d.disabled ? 'disabled' : `${Math.round(d.width)} cm`}</span>
+              </div>
+            ))}
+        </section>
+      )}
 
       {wall && wallIndex !== undefined && (
         <section>

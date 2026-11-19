@@ -47,20 +47,39 @@ export interface PlanSettings {
   doorHeight: number;
 }
 
+/** User adjustments to a derived doorway, keyed by `pairKey(roomA, roomB)`. */
+export interface DoorwaySetting {
+  disabled?: boolean;
+  /** Shift of the door centre from the middle of the shared wall stretch (cm, along `Doorway.axis`). */
+  offset?: number;
+}
+
 export interface Plan {
   version: 1;
   units: 'cm';
   settings: PlanSettings;
   rooms: Room[];
+  doorwaySettings: Record<string, DoorwaySetting>;
 }
 
 /** Derived from room geometry: one doorway per pair of adjoining rooms. */
 export interface Doorway {
   id: string;
+  /** Key into `Plan.doorwaySettings`. */
+  key: string;
+  /** Ordered by id, so the pair order is stable regardless of room order. */
   rooms: [string, string];
   /** Wall index in each of the two rooms. */
   walls: [number, number];
   center: Vec2;
   width: number;
   height: number;
+  disabled: boolean;
+  /** Current (clamped) offset from the middle of the shared stretch. */
+  offset: number;
+  /** The offset may range over [-maxOffset, maxOffset]. */
+  maxOffset: number;
+  /** Middle of the shared wall stretch, and the unit direction offsets are measured along. */
+  stretchCenter: Vec2;
+  axis: Vec2;
 }

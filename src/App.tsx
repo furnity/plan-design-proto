@@ -5,7 +5,7 @@ import { PlanEditor, type Selection } from './components/PlanEditor';
 import { Viewer3D } from './components/Viewer3D';
 import { computeDoorways } from './model/doorways';
 import { downloadText, serializePlan } from './model/io';
-import { addRoom, createInitialPlan, findRoom, parsePlan, removeRoom, removeVertex, removeWindow } from './model/plan';
+import { addRoom, createInitialPlan, findRoom, parsePlan, removeRoom, removeVertex, removeWindow, setDoorway } from './model/plan';
 import type { Plan } from './model/types';
 
 const STORAGE_KEY = 'floorplan-proto:plan';
@@ -77,10 +77,11 @@ export default function App() {
   // Drop selection that no longer exists (after undo, delete, import...).
   useEffect(() => {
     const room = findRoom(plan, selection.roomId);
-    if (selection.roomId && !room) setSelection({});
+    if (selection.doorwayKey && !doorways.some((d) => d.key === selection.doorwayKey)) setSelection({});
+    else if (selection.roomId && !room) setSelection({});
     else if (room && selection.vertex !== undefined && selection.vertex >= room.points.length) setSelection({ roomId: room.id });
     else if (room && selection.wall !== undefined && selection.wall >= room.walls.length) setSelection({ roomId: room.id });
-  }, [plan, selection]);
+  }, [plan, doorways, selection]);
 
   useEffect(() => {
     if (!toast) return;
@@ -96,6 +97,10 @@ export default function App() {
   };
 
   const deleteSelected = useCallback(() => {
+    if (selection.doorwayKey) {
+      history.apply(setDoorway(plan, selection.doorwayKey, { disabled: true }));
+      return;
+    }
     const room = findRoom(plan, selection.roomId);
     if (!room) return;
     if (selection.windowId && selection.wall !== undefined) {
