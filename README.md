@@ -5,7 +5,7 @@ A floor plan editor built with React and Three.js. The 2D plan is drawn in SVG a
 ```sh
 npm install
 npm run dev      # http://localhost:5173
-npm test         # model unit tests
+npm test         # unit tests, in a __tests__ folder next to the code they test
 npm run build
 ```
 

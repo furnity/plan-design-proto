@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { computeDoorways } from './doorways';
-import { v } from './geometry';
-import { resolveRoomMove } from './placement';
-import { createInitialPlan, createRectRoom, moveRoom } from './plan';
-import type { Plan, Vec2 } from './types';
+import { computeDoorways } from '../doorways';
+import { v } from '../geometry';
+import { resolveRoomMove } from '../placement';
+import { createInitialPlan, createRectRoom, moveRoom } from '../plan';
+import type { Plan, Vec2 } from '../types';
 
 /** Room 1 is 500 × 400 at the origin. */
 function planWith(...rooms: [number, number, number, number][]): Plan {
