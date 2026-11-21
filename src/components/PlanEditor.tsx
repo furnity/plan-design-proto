@@ -25,6 +25,7 @@ import {
   setDoorway,
   updateWindow,
 } from '../model/plan';
+import { resolveRoomMove } from '../model/placement';
 import { FLOOR_TYPES, type Doorway, type Plan, type Room, type Vec2 } from '../model/types';
 import { roomWallLayouts, sliceWall, wallFootprint, wallPoint, type WallLayout } from '../model/walls';
 import { FLOOR_COLORS, floorTextureDataUrl, floorTextureSizeCm } from '../three/textures';
@@ -63,7 +64,8 @@ interface View {
 
 type Drag =
   | { kind: 'pan'; startClient: Vec2; startView: View; moved: boolean }
-  | { kind: 'room'; roomId: string; start: Vec2; origin: Plan; moved: boolean }
+  /** `shown`: translation currently applied, used to keep placement stable between moves. */
+  | { kind: 'room'; roomId: string; start: Vec2; origin: Plan; moved: boolean; shown: Vec2 }
   /** `undoTo`: plan to restore on undo when it differs from `origin` (a corner inserted at drag start). */
   /** `grab`: offset from the pointer to the corner, when the drag didn't start on the corner itself. */
   | { kind: 'vertex'; roomId: string; index: number; origin: Plan; moved: boolean; undoTo?: Plan; grab?: Vec2 }
@@ -151,7 +153,6 @@ export function PlanEditor({ plan, doorways, selection, grid, fitKey, onSelect, 
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [view, setView] = useState<View>({ x: -100, y: -100, zoom: 1 });
-  const [blocked, setBlocked] = useState(false);
   const drag = useRef<Drag | null>(null);
   const fitted = useRef(false);
 
@@ -254,8 +255,13 @@ export function PlanEditor({ plan, doorways, selection, grid, fitKey, onSelect, 
     let next: Plan | null = null;
     switch (d.kind) {
       case 'room': {
-        const delta = snapRoomDelta(room, sub(p, d.start), d.origin, thr, grid);
-        next = moveRoom(d.origin, d.roomId, delta);
+        // Aim for the snapped cursor position; if that spot is taken, go to the nearest free one.
+        const target = snapRoomDelta(room, sub(p, d.start), d.origin, thr, grid);
+        const delta = resolveRoomMove(d.origin, d.roomId, target, d.shown);
+        if (delta) {
+          next = moveRoom(d.origin, d.roomId, delta);
+          if (next) d.shown = delta;
+        }
         break;
       }
       case 'vertex':
@@ -276,13 +282,11 @@ export function PlanEditor({ plan, doorways, selection, grid, fitKey, onSelect, 
     }
     d.moved = true;
     if (next) onPreview(next);
-    setBlocked(!next);
   };
 
   const onPointerUp = () => {
     const d = drag.current;
     drag.current = null;
-    setBlocked(false);
     if (!d) return;
     if (d.kind === 'pan') {
       if (!d.moved) onSelect({});
@@ -363,7 +367,7 @@ export function PlanEditor({ plan, doorways, selection, grid, fitKey, onSelect, 
             fill={`url(#floor-${room.floorType})`}
             onPointerDown={(e) => {
               onSelect({ roomId: room.id });
-              begin(e, { kind: 'room', roomId: room.id, start: toWorld(e), origin: plan, moved: false });
+              begin(e, { kind: 'room', roomId: room.id, start: toWorld(e), origin: plan, moved: false, shown: v(0, 0) });
             }}
           />
         ))}
@@ -583,7 +587,6 @@ export function PlanEditor({ plan, doorways, selection, grid, fitKey, onSelect, 
         <button onClick={fit}>Fit</button>
         <span>{Math.round(view.zoom * 100)}%</span>
       </div>
-      {blocked && <div className="editor-blocked">Rooms can't overlap or self-intersect</div>}
       <div className="editor-help">
         Drag floor: move room · drag wall: move wall · + or double-click wall: add corner · drag background: pan · wheel: zoom
       </div>

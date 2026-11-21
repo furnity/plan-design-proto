@@ -96,10 +96,6 @@ label.inline { display: inline-flex; align-items: center; gap: 6px; color: var(-
 
 .editor-hud { position: absolute; top: 10px; left: 10px; display: flex; gap: 8px; align-items: center; color: var(--muted); }
 .editor-help { position: absolute; bottom: 8px; left: 10px; right: 10px; color: var(--muted); font-size: 12px; pointer-events: none; }
-.editor-blocked {
-  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-  background: var(--danger); color: #fff; padding: 5px 12px; border-radius: 6px; font-size: 13px; pointer-events: none;
-}
 
 /* ---------- 3D viewer ---------- */
 .viewer { position: relative; min-width: 0; min-height: 0; border-right: 1px solid var(--border); }

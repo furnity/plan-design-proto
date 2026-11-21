@@ -15,7 +15,7 @@ Every push to `main` runs the tests, builds the site and deploys it to GitHub Pa
 ## Using it
 - **Drag a floor** to move a room. **Drag a wall** to move it along its normal (hold Shift to move it freely). On the selected room, **drag a corner** handle.
 - **Add a corner** by clicking or dragging the "+" handle in the middle of a wall of the selected room, by double-clicking a wall, or with "Split wall" in the wall inspector. Select a corner and press Delete to remove it.
-- A move that would overlap another room or make a room's outline cross itself is refused, and a red banner appears.
+- Rooms can't overlap. When you drag a room into another one, it goes to the free spot nearest the cursor instead: it stops flush against the other room, slides along its walls, and follows the cursor around it (for example from its west side to its south side) in one drag. Wall and corner moves that would overlap, or make an outline cross itself, are refused, and the room stays at its last valid shape.
 - When two rooms share a wall, a doorway is created automatically. Its width and height are set under Plan settings.
 - **Drag a doorway** to slide it along the shared wall. Select it and press Delete (or untick "Enabled") to disable it. Click its dashed outline to select it again and re-enable it.
 - Select a wall to set its thickness (default 10 cm) and to add windows. Each window has a width, a height, a distance from the floor and a position along the wall. Windows can also be dragged along the wall.
@@ -25,6 +25,7 @@ Every push to `main` runs the tests, builds the site and deploys it to GitHub Pa
 - `src/model/types.ts`: the JSON plan format (units are cm)
 - `src/model/plan.ts`: editing operations, validation and JSON parsing
 - `src/model/doorways.ts`: works out doorways from shared walls
+- `src/model/placement.ts`: finds the nearest free position for a dragged room
 - `src/model/walls.ts`: wall layout used by both the 2D plan and the 3D model (walls built inward, mitred corners, walls split around openings)
 - `src/three/buildModel.ts`: `buildPlanModel(plan): THREE.Group`, with no React dependency
 - `src/components/`: the SVG editor, 3D viewer, inspector and JSON dialog
